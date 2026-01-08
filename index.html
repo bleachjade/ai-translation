@@ -3,44 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Thai Vision - 100% Local AI</title>
+    <title>Thai Vision - Settings Enabled</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Local OCR Engine -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;500;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Kanit', sans-serif;
             background-color: #000;
-            margin: 0; padding: 0;
-            overflow: hidden; height: 100vh; width: 100vw;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
             touch-action: manipulation;
         }
-        .app-container { position: fixed; inset: 0; display: flex; flex-direction: column; }
-        video, #freezeFrame { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; z-index: 10; }
         
-        #resultsSheet {
-            position: fixed; bottom: 0; left: 0; right: 0;
+        .app-container {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        video, #freezeFrame {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 10;
+        }
+
+        #resultsSheet, #settingsSheet {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
             background: rgba(15, 23, 42, 0.98);
             backdrop-filter: blur(20px);
             border-top: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 24px 24px 0 0;
-            z-index: 50;
+            z-index: 60;
             transform: translateY(100%);
             transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            max-height: 75vh;
-            display: flex; flex-direction: column;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
             box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.8);
         }
-        #resultsSheet.open { transform: translateY(0); }
 
-        .results-list { overflow-y: auto; padding: 0 20px 40px 20px; flex-grow: 1; }
-        .result-item { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+        #resultsSheet.open, #settingsSheet.open {
+            transform: translateY(0);
+        }
 
-        .loader { border: 3px solid rgba(255,255,255,0.1); border-top: 3px solid #3b82f6; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; }
+        .sheet-handle {
+            width: 40px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            margin: 12px auto;
+            flex-shrink: 0;
+        }
+
+        .scroll-area {
+            overflow-y: auto;
+            padding: 0 20px 40px 20px;
+            flex-grow: 1;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .result-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .loader {
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            animation: spin 1s linear infinite;
+        }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        #permissionOverlay { position: fixed; inset: 0; background: #0f172a; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; text-align: center; }
+        .flash {
+            animation: flashAnim 0.3s ease-out;
+        }
+        @keyframes flashAnim {
+            0% { background: white; opacity: 0; }
+            50% { opacity: 0.8; }
+            100% { opacity: 0; }
+        }
+
+        #permissionOverlay {
+            position: fixed;
+            inset: 0;
+            background: #0f172a;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .icon-btn {
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 50%;
+            padding: 12px;
+            transition: all 0.2s;
+        }
+        .icon-btn:active { transform: scale(0.9); }
     </style>
 </head>
 <body class="text-white">
@@ -48,153 +129,225 @@
     <div id="permissionOverlay">
         <div class="mb-6 bg-blue-500/10 p-6 rounded-full">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2-2H5a2 2 0 01-2-2V9z" />
             </svg>
         </div>
-        <h2 class="text-xl font-bold mb-2">Local Thai Vision</h2>
-        <p class="text-slate-400 text-sm mb-8">No Internet Required. 100% Private.</p>
-        <button id="startBtn" class="bg-blue-600 w-full py-4 rounded-full font-bold shadow-lg active:scale-95 transition-transform mb-4">START ENGINE</button>
-        <p id="initStatus" class="text-[10px] text-slate-500 uppercase tracking-widest font-bold"></p>
+        <h2 class="text-xl font-bold mb-2">Thai Vision</h2>
+        <p class="text-slate-400 text-sm mb-8">Access camera to translate live.</p>
+        <button id="startCamBtn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-10 rounded-full shadow-lg transition transform active:scale-95 w-full">
+            ENABLE CAMERA
+        </button>
+        <button id="openSettingsInit" class="mt-4 text-xs text-slate-500 underline">Add API Key First</button>
     </div>
 
     <div class="app-container">
         <video id="video" autoplay playsinline muted></video>
         <canvas id="freezeFrame" class="hidden"></canvas>
+        <canvas id="captureCanvas" class="hidden"></canvas>
+
+        <div id="flashOverlay" class="fixed inset-0 z-40 pointer-events-none"></div>
+
+        <!-- Floating Settings Icon -->
+        <div class="fixed top-6 right-6 z-40">
+            <button id="settingsBtn" class="icon-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+            </button>
+        </div>
+
         <div id="status" class="fixed inset-0 z-30 bg-black/50 backdrop-blur-md hidden flex-col items-center justify-center">
             <div class="loader mb-4"></div>
-            <span id="statusText" class="text-sm font-bold tracking-[0.2em] text-blue-400 uppercase">Thinking...</span>
-            <span id="progressText" class="text-[10px] text-slate-400 mt-2">Loading local brain (first time only)</span>
+            <span id="statusText" class="text-sm font-bold tracking-[0.2em] text-blue-400 uppercase">Processing...</span>
         </div>
 
         <div id="mainControls" class="fixed bottom-12 left-0 right-0 flex justify-center items-center z-40 px-6">
             <button id="snapBtn" class="bg-white text-black h-20 w-20 rounded-full flex items-center justify-center shadow-2xl active:scale-90 transition-transform ring-4 ring-white/20">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2-2H5a2 2 0 01-2-2V9z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                 </svg>
             </button>
         </div>
 
+        <!-- Results Sheet -->
         <div id="resultsSheet">
             <div class="sheet-handle"></div>
             <div class="px-5 pb-4 flex justify-between items-center border-b border-white/10">
-                <h2 class="text-lg font-bold text-blue-400">Local Translation</h2>
-                <button id="closeSheet" class="text-[10px] font-black uppercase tracking-widest text-slate-400 py-2 px-5 bg-white/5 rounded-full border border-white/10">Close</button>
+                <h2 class="text-lg font-bold text-blue-400">Translations</h2>
+                <button id="closeSheet" class="text-xs font-black uppercase tracking-widest text-slate-400 py-2 px-5 bg-white/5 rounded-full border border-white/10">Close</button>
             </div>
-            <div id="resultsList" class="results-list mt-4"></div>
+            <div id="resultsList" class="scroll-area mt-4"></div>
         </div>
+
+        <!-- Settings Sheet -->
+        <div id="settingsSheet">
+            <div class="sheet-handle"></div>
+            <div class="px-5 pb-6">
+                <h2 class="text-xl font-bold mb-2">Setup API Key</h2>
+                <p class="text-sm text-slate-400 mb-6 leading-relaxed">
+                    Paste your Gemini API Key here. It is saved only in your phone's browser storage.
+                </p>
+                <input id="keyInput" type="password" placeholder="AIzaSy..." class="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-sm mb-4 outline-none focus:ring-2 focus:ring-blue-500">
+                <div class="flex gap-3">
+                    <button id="saveKeyBtn" class="flex-1 bg-blue-600 font-bold py-4 rounded-xl active:scale-95 transition">SAVE KEY</button>
+                    <button id="closeSettings" class="px-6 bg-slate-800 font-bold py-4 rounded-xl text-slate-400">CLOSE</button>
+                </div>
+                <p class="mt-6 text-[10px] text-slate-500 text-center uppercase tracking-widest">
+                    No Key? Get one at <a href="https://aistudio.google.com/" target="_blank" class="text-blue-500 underline">AI Studio</a>
+                </p>
+            </div>
+        </div>
+
+        <div id="toast" class="fixed top-12 left-6 right-6 bg-red-600 p-4 rounded-2xl text-center text-xs font-bold z-[100] hidden shadow-2xl border border-white/10"></div>
     </div>
 
-    <script type="module">
-        // Import local translation brain
-        import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1';
-
+    <script>
         const video = document.getElementById('video');
         const freezeFrame = document.getElementById('freezeFrame');
+        const captureCanvas = document.getElementById('captureCanvas');
         const snapBtn = document.getElementById('snapBtn');
-        const startBtn = document.getElementById('startBtn');
+        const startCamBtn = document.getElementById('startCamBtn');
+        const permissionOverlay = document.getElementById('permissionOverlay');
         const statusDiv = document.getElementById('status');
-        const statusText = document.getElementById('statusText');
-        const progressText = document.getElementById('progressText');
         const resultsSheet = document.getElementById('resultsSheet');
         const resultsList = document.getElementById('resultsList');
         const closeSheet = document.getElementById('closeSheet');
-        const permissionOverlay = document.getElementById('permissionOverlay');
-        const initStatus = document.getElementById('initStatus');
+        const settingsSheet = document.getElementById('settingsSheet');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const saveKeyBtn = document.getElementById('saveKeyBtn');
+        const keyInput = document.getElementById('keyInput');
+        const closeSettings = document.getElementById('closeSettings');
+        const openSettingsInit = document.getElementById('openSettingsInit');
+        const toast = document.getElementById('toast');
+        const flashOverlay = document.getElementById('flashOverlay');
 
-        let translator = null;
         let isFrozen = false;
+        let activeKey = localStorage.getItem('GEMINI_API_KEY') || "";
 
-        async function initAI() {
+        // UI Listeners
+        settingsBtn.onclick = openSettingsInit.onclick = () => {
+            keyInput.value = activeKey;
+            settingsSheet.classList.add('open');
+        };
+        closeSettings.onclick = () => settingsSheet.classList.remove('open');
+        saveKeyBtn.onclick = () => {
+            const val = keyInput.value.trim();
+            if(val) {
+                activeKey = val;
+                localStorage.setItem('GEMINI_API_KEY', val);
+                settingsSheet.classList.remove('open');
+                showToast("Key saved!", true);
+            }
+        };
+
+        async function initCamera() {
             try {
-                initStatus.textContent = "Waking up camera...";
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment" },
+                    video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } },
                     audio: false
                 });
                 video.srcObject = stream;
-                
-                initStatus.textContent = "Loading translation brain...";
-                // Load small, efficient local translation model
-                translator = await pipeline('translation', 'Xenova/t5-small', {
-                    progress_callback: (data) => {
-                        if (data.status === 'progress') {
-                            initStatus.textContent = `Downloading AI: ${Math.round(data.progress)}%`;
-                        }
-                    }
-                });
-
+                video.onloadedmetadata = () => video.play();
                 permissionOverlay.style.display = 'none';
             } catch (err) {
-                initStatus.textContent = "Error: " + err.message;
+                showToast("Camera error. Check permissions.");
             }
         }
 
-        async function processFrame() {
-            if (!translator || isFrozen) return;
+        function showToast(msg, isSuccess = false) {
+            toast.textContent = msg;
+            toast.style.backgroundColor = isSuccess ? '#059669' : '#dc2626';
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
 
-            // 1. Capture
+        async function translateToThai() {
+            if (!activeKey) {
+                settingsSheet.classList.add('open');
+                showToast("Please add your API Key first.");
+                return;
+            }
+            if (video.readyState < 2 || isFrozen) return;
+
+            flashOverlay.classList.add('flash');
+            setTimeout(() => flashOverlay.classList.remove('flash'), 300);
+
             freezeFrame.width = video.videoWidth;
             freezeFrame.height = video.videoHeight;
-            const ctx = freezeFrame.getContext('2d');
-            ctx.drawImage(video, 0, 0);
-
+            freezeFrame.getContext('2d').drawImage(video, 0, 0);
+            
             isFrozen = true;
             video.style.opacity = "0";
             freezeFrame.classList.remove('hidden');
             statusDiv.classList.remove('hidden');
             statusDiv.classList.add('flex');
-            statusText.textContent = "OCR Reading...";
+
+            captureCanvas.width = video.videoWidth;
+            captureCanvas.height = video.videoHeight;
+            captureCanvas.getContext('2d').drawImage(video, 0, 0);
+            const base64 = captureCanvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+
+            const prompt = `OCR this image. Translate to Thai. Provide "phonetic" pronunciation for original text. Format: [{"thai": "...", "phonetic": "...", "source": "..."}]`;
 
             try {
-                // 2. Local OCR (Tesseract)
-                const { data: { text, blocks } } = await Tesseract.recognize(freezeFrame, 'eng', {
-                    logger: m => { if(m.status === 'recognizing text') statusText.textContent = `OCR: ${Math.round(m.progress * 100)}%` }
-                });
-
-                if (!text.trim()) {
-                    alert("No text found.");
+                const response = await callGemini(prompt, base64);
+                const results = parseResults(response);
+                if (results.length === 0) {
+                    showToast("No text found.");
                     resetCamera();
-                    return;
+                } else {
+                    renderResults(results);
+                    resultsSheet.classList.add('open');
                 }
-
-                statusText.textContent = "Translating...";
-                resultsList.innerHTML = '';
-
-                // 3. Local Translation (Transformers.js)
-                // We split by lines to give better results
-                const lines = text.split('\n').filter(l => l.trim().length > 3);
-                
-                for (const line of lines) {
-                    const result = await translator(line, {
-                        src_lang: 'eng',
-                        tgt_lang: 'tha', // Note: T5 models usually use task prefixes
-                    });
-
-                    const thaiText = result[0].translation_text;
-                    // Simple Phonetic logic (Mocking since T5-small doesn't do phonetic romanization natively)
-                    // For a true local phonetic, you'd need another small model or mapping.
-                    const phonetic = line.toUpperCase(); 
-
-                    const div = document.createElement('div');
-                    div.className = 'result-item';
-                    div.innerHTML = `
-                        <div class="flex flex-col gap-1">
-                            <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Original: ${line}</span>
-                            <span class="text-sm font-black text-yellow-400 tracking-wide uppercase">Pronounce: ${phonetic}</span>
-                            <div class="h-[1px] bg-white/10 my-1"></div>
-                            <span class="text-xl font-medium text-white">${thaiText}</span>
-                        </div>
-                    `;
-                    resultsList.appendChild(div);
-                }
-
-                resultsSheet.classList.add('open');
             } catch (err) {
-                alert("Processing failed: " + err.message);
+                showToast(err.message);
                 resetCamera();
             } finally {
                 statusDiv.classList.add('hidden');
             }
+        }
+
+        async function callGemini(prompt, base64) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${activeKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: "image/jpeg", data: base64 } }] }],
+                generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
+            };
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error?.message || "API error.");
+            }
+            return await res.json();
+        }
+
+        function parseResults(data) {
+            try { return JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || "[]"); } 
+            catch (e) { return []; }
+        }
+
+        function renderResults(results) {
+            resultsList.innerHTML = '';
+            results.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'result-item';
+                div.innerHTML = `
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Original: ${item.source}</span>
+                        <span class="text-sm font-black text-yellow-400 tracking-wide uppercase italic">Pronounce: ${item.phonetic}</span>
+                        <div class="h-[1px] bg-white/10 my-1"></div>
+                        <span class="text-xl font-medium text-white">${item.thai}</span>
+                    </div>
+                `;
+                resultsList.appendChild(div);
+            });
         }
 
         function resetCamera() {
@@ -202,12 +355,13 @@
             video.style.opacity = "1";
             freezeFrame.classList.add('hidden');
             resultsSheet.classList.remove('open');
-            statusDiv.classList.add('hidden');
         }
 
-        startBtn.onclick = initAI;
-        snapBtn.onclick = processFrame;
+        snapBtn.onclick = translateToThai;
         closeSheet.onclick = resetCamera;
+        startCamBtn.onclick = initCamera;
+
+        window.onload = () => { if (activeKey) initCamera().catch(() => {}); };
     </script>
 </body>
 </html>
