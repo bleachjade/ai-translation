@@ -140,7 +140,7 @@
 
         <div id="status" class="fixed inset-0 z-30 bg-black/50 backdrop-blur-md hidden flex-col items-center justify-center">
             <div class="loader mb-4"></div>
-            <span id="statusText" class="text-sm font-bold tracking-[0.2em] text-blue-400 uppercase">Analyzing Scene...</span>
+            <span id="statusText" class="text-sm font-bold tracking-[0.2em] text-blue-400 uppercase">Analyzing...</span>
         </div>
 
         <div id="mainControls" class="fixed bottom-12 left-0 right-0 flex justify-center items-center z-40 px-6">
@@ -187,7 +187,6 @@
                 const constraints = {
                     video: { 
                         facingMode: { ideal: "environment" },
-                        // Fallback to simpler constraints if ideal fails
                         width: { ideal: 1280 },
                         height: { ideal: 720 }
                     },
@@ -197,7 +196,6 @@
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
                 
-                // Vital for iOS Safari
                 video.setAttribute('autoplay', '');
                 video.setAttribute('muted', '');
                 video.setAttribute('playsinline', '');
@@ -215,12 +213,12 @@
                 });
             } catch (err) {
                 console.error("Detailed Camera Error:", err);
-                if (err.name === 'NotAllowedError') {
-                    showToast("Permission denied. Please check your browser's site settings.");
-                } else if (err.name === 'NotFoundError') {
-                    showToast("No camera found on this device.");
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    showToast("Permission denied. Reset settings in your browser.");
+                } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                    showToast("No camera detected.");
                 } else {
-                    showToast("Error: " + err.message);
+                    showToast("Camera Error: " + err.message);
                 }
                 throw err;
             }
@@ -251,31 +249,27 @@
 
             captureCanvas.width = video.videoWidth;
             captureCanvas.height = video.videoHeight;
-            captureCanvas.getContext('2d').drawImage(video, 0, 0);
+            const ctx = captureCanvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
             const base64 = captureCanvas.toDataURL('image/jpeg', 0.85).split(',')[1];
 
-            const prompt = `
-                Perform OCR on this image. 
-                1. Detect all meaningful text blocks.
-                2. Translate them to Thai.
-                3. Provide "phonetic": Phonetic guide for the ORIGINAL detected text so I can speak it.
-                4. Provide "source": The original text detected.
-                Return JSON array only: [{"thai": "...", "phonetic": "...", "source": "..."}]
-            `;
+            const prompt = `OCR this image. Translate to Thai. Provide "phonetic" pronunciation for original text. Format: [{"thai": "...", "phonetic": "...", "source": "..."}]`;
 
             try {
                 const response = await callGemini(prompt, base64);
                 const results = parseResults(response);
                 
                 if (results.length === 0) {
-                    showToast("No text found. Try centering the text.");
+                    showToast("No text detected.");
                     resetCamera();
                 } else {
                     renderResults(results);
                     resultsSheet.classList.add('open');
                 }
             } catch (err) {
-                showToast("Translation error. Check your connection.");
+                console.error("API Call Error:", err);
+                showToast("Translation error. Please try again.");
                 resetCamera();
             } finally {
                 statusDiv.classList.add('hidden');
@@ -287,10 +281,14 @@
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             const payload = {
                 contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: "image/jpeg", data: base64 } }] }],
-                generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
+                generationConfig: { 
+                    responseMimeType: "application/json", 
+                    temperature: 0.1,
+                    maxOutputTokens: 1024
+                }
             };
 
-            const delays = [1000, 2000, 4000];
+            const delays = [1000, 2000, 4000, 8000];
             for (let i = 0; i <= delays.length; i++) {
                 try {
                     const res = await fetch(url, {
@@ -298,7 +296,12 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
-                    if (!res.ok) throw new Error();
+                    
+                    if (!res.ok) {
+                        const errorData = await res.json().catch(() => ({}));
+                        throw new Error(errorData.error?.message || `HTTP ${res.status}`);
+                    }
+                    
                     return await res.json();
                 } catch (e) {
                     if (i === delays.length) throw e;
@@ -311,8 +314,12 @@
         function parseResults(data) {
             try {
                 const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                return JSON.parse(text || "[]");
-            } catch (e) { return []; }
+                if (!text) return [];
+                return JSON.parse(text);
+            } catch (e) { 
+                console.error("JSON Parsing Error:", e);
+                return []; 
+            }
         }
 
         function renderResults(results) {
@@ -322,10 +329,10 @@
                 div.className = 'result-item';
                 div.innerHTML = `
                     <div class="flex flex-col gap-1">
-                        <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Original: ${item.source}</span>
-                        <span class="text-sm font-black text-yellow-400 tracking-wide uppercase">Speak: ${item.phonetic}</span>
+                        <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Original: ${item.source || '...'}</span>
+                        <span class="text-sm font-black text-yellow-400 tracking-wide uppercase">Speak: ${item.phonetic || '...'}</span>
                         <div class="h-[1px] bg-white/10 my-1"></div>
-                        <span class="text-xl font-medium text-white">${item.thai}</span>
+                        <span class="text-xl font-medium text-white">${item.thai || '...'}</span>
                     </div>
                 `;
                 resultsList.appendChild(div);
@@ -341,18 +348,10 @@
 
         snapBtn.addEventListener('click', translateToThai);
         closeSheet.addEventListener('click', resetCamera);
-        
-        startCamBtn.addEventListener('click', () => {
-            initCamera().catch(() => {
-                // Already handled in initCamera
-            });
-        });
+        startCamBtn.addEventListener('click', () => initCamera().catch(() => {}));
 
-        // Try auto-init, but the button is there if it fails
         window.addEventListener('load', () => {
-            initCamera().catch(() => {
-                console.log("Auto-init failed, awaiting user click.");
-            });
+            initCamera().catch(() => {});
         });
     </script>
 </body>
