@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Thai Vision - Optimized Speed</title>
+    <title>Thai Vision - Settings Enabled</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;500;700&display=swap" rel="stylesheet">
     <style>
@@ -132,7 +132,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2-2H5a2 2 0 01-2-2V9z" />
             </svg>
         </div>
-        <h2 class="text-xl font-bold mb-2 text-white">Thai Vision</h2>
+        <h2 class="text-xl font-bold mb-2">Thai Vision</h2>
         <p class="text-slate-400 text-sm mb-8">Access camera to translate live.</p>
         <button id="startCamBtn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-10 rounded-full shadow-lg transition transform active:scale-95 w-full">
             ENABLE CAMERA
@@ -147,6 +147,7 @@
 
         <div id="flashOverlay" class="fixed inset-0 z-40 pointer-events-none"></div>
 
+        <!-- Floating Settings Icon -->
         <div class="fixed top-6 right-6 z-40">
             <button id="settingsBtn" class="icon-btn">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -158,7 +159,7 @@
 
         <div id="status" class="fixed inset-0 z-30 bg-black/50 backdrop-blur-md hidden flex-col items-center justify-center">
             <div class="loader mb-4"></div>
-            <span id="statusText" class="text-sm font-bold tracking-[0.2em] text-blue-400 uppercase">Translating...</span>
+            <span id="statusText" class="text-sm font-bold tracking-[0.2em] text-blue-400 uppercase">Processing...</span>
         </div>
 
         <div id="mainControls" class="fixed bottom-12 left-0 right-0 flex justify-center items-center z-40 px-6">
@@ -169,25 +170,32 @@
             </button>
         </div>
 
+        <!-- Results Sheet -->
         <div id="resultsSheet">
             <div class="sheet-handle"></div>
             <div class="px-5 pb-4 flex justify-between items-center border-b border-white/10">
-                <h2 class="text-lg font-bold text-blue-400">Results</h2>
+                <h2 class="text-lg font-bold text-blue-400">Translations</h2>
                 <button id="closeSheet" class="text-xs font-black uppercase tracking-widest text-slate-400 py-2 px-5 bg-white/5 rounded-full border border-white/10">Close</button>
             </div>
             <div id="resultsList" class="scroll-area mt-4"></div>
         </div>
 
+        <!-- Settings Sheet -->
         <div id="settingsSheet">
             <div class="sheet-handle"></div>
             <div class="px-5 pb-6">
-                <h2 class="text-xl font-bold mb-2">API Setup</h2>
-                <p class="text-sm text-slate-400 mb-6 leading-relaxed">Enter your Gemini API key to start translating.</p>
-                <input id="keyInput" type="password" placeholder="API Key..." class="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-sm mb-4 outline-none focus:ring-2 focus:ring-blue-500">
+                <h2 class="text-xl font-bold mb-2">Setup API Key</h2>
+                <p class="text-sm text-slate-400 mb-6 leading-relaxed">
+                    Paste your Gemini API Key here. It is saved only in your phone's browser storage.
+                </p>
+                <input id="keyInput" type="password" placeholder="AIzaSy..." class="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-sm mb-4 outline-none focus:ring-2 focus:ring-blue-500">
                 <div class="flex gap-3">
-                    <button id="saveKeyBtn" class="flex-1 bg-blue-600 font-bold py-4 rounded-xl active:scale-95 transition">SAVE</button>
+                    <button id="saveKeyBtn" class="flex-1 bg-blue-600 font-bold py-4 rounded-xl active:scale-95 transition">SAVE KEY</button>
                     <button id="closeSettings" class="px-6 bg-slate-800 font-bold py-4 rounded-xl text-slate-400">CLOSE</button>
                 </div>
+                <p class="mt-6 text-[10px] text-slate-500 text-center uppercase tracking-widest">
+                    No Key? Get one at <a href="https://aistudio.google.com/" target="_blank" class="text-blue-500 underline">AI Studio</a>
+                </p>
             </div>
         </div>
 
@@ -217,6 +225,7 @@
         let isFrozen = false;
         let activeKey = localStorage.getItem('GEMINI_API_KEY') || "";
 
+        // UI Listeners
         settingsBtn.onclick = openSettingsInit.onclick = () => {
             keyInput.value = activeKey;
             settingsSheet.classList.add('open');
@@ -242,7 +251,7 @@
                 video.onloadedmetadata = () => video.play();
                 permissionOverlay.style.display = 'none';
             } catch (err) {
-                showToast("Camera error.");
+                showToast("Camera error. Check permissions.");
             }
         }
 
@@ -256,15 +265,14 @@
         async function translateToThai() {
             if (!activeKey) {
                 settingsSheet.classList.add('open');
+                showToast("Please add your API Key first.");
                 return;
             }
             if (video.readyState < 2 || isFrozen) return;
 
-            // Flash effect
             flashOverlay.classList.add('flash');
             setTimeout(() => flashOverlay.classList.remove('flash'), 300);
 
-            // 1. Instant Freeze View
             freezeFrame.width = video.videoWidth;
             freezeFrame.height = video.videoHeight;
             freezeFrame.getContext('2d').drawImage(video, 0, 0);
@@ -275,30 +283,12 @@
             statusDiv.classList.remove('hidden');
             statusDiv.classList.add('flex');
 
-            // 2. Optimized Capture (Resize for faster upload)
-            const MAX_DIM = 720;
-            let targetWidth = video.videoWidth;
-            let targetHeight = video.videoHeight;
-            if (targetWidth > targetHeight) {
-                if (targetWidth > MAX_DIM) {
-                    targetHeight = Math.round(targetHeight * (MAX_DIM / targetWidth));
-                    targetWidth = MAX_DIM;
-                }
-            } else {
-                if (targetHeight > MAX_DIM) {
-                    targetWidth = Math.round(targetWidth * (MAX_DIM / targetHeight));
-                    targetHeight = MAX_DIM;
-                }
-            }
-            captureCanvas.width = targetWidth;
-            captureCanvas.height = targetHeight;
-            captureCanvas.getContext('2d').drawImage(video, 0, 0, targetWidth, targetHeight);
-            
-            // Lower JPEG quality significantly cuts upload time while retaining OCR quality
-            const base64 = captureCanvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+            captureCanvas.width = video.videoWidth;
+            captureCanvas.height = video.videoHeight;
+            captureCanvas.getContext('2d').drawImage(video, 0, 0);
+            const base64 = captureCanvas.toDataURL('image/jpeg', 0.85).split(',')[1];
 
-            // Ultra-concise prompt for faster model inference
-            const prompt = `OCR image. Translate to Thai. Output JSON ONLY: [{"thai": "...", "phonetic": "original_sound_guide", "source": "original_text"}]`;
+            const prompt = `OCR this image. Translate to Thai. Provide "phonetic" pronunciation for original text. Format: [{"thai": "...", "phonetic": "...", "source": "..."}]`;
 
             try {
                 const response = await callGemini(prompt, base64);
@@ -319,15 +309,10 @@
         }
 
         async function callGemini(prompt, base64) {
-            // Using the preview model which is optimized for vision speed
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${activeKey}`;
             const payload = {
                 contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: "image/jpeg", data: base64 } }] }],
-                generationConfig: { 
-                    responseMimeType: "application/json", 
-                    temperature: 0, // Lower temperature = faster/more deterministic
-                    maxOutputTokens: 1024
-                }
+                generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
             };
 
             const res = await fetch(url, {
